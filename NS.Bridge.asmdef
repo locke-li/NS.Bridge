@@ -1,0 +1,21 @@
+{
+    "name": "NS.Bridge",
+    "references": [
+        "GUID:fa54c422c6947ae4990c351ad9d86fea",
+        "GUID:8670d956a1d084545828e0a91979e0bc",
+        "GUID:38f21d92245c7f54293b1ae2506cae1d",
+        "GUID:72612c9a70ca21840965b40afe6413a6",
+        "GUID:6b3611e6614acd44a95b97a0873b8cb4",
+        "GUID:3064dd5d07878584ea054d51981be438",
+        "GUID:66b7af1d11147184d8b749dea2e9cc25"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
