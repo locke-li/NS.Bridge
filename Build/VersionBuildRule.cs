@@ -35,28 +35,32 @@ namespace NS.Bridge {
                 Debug.LogError("failed to locate data repo");
                 return;
             }
-            var list = new List<(string, string, string[], string[])>();
+            var list = new List<(string, string, string[], string[], string[])>();
             if (data) list.Add((confRepoPath + "/gen/rawdata/client", Path.Combine(Application.streamingAssetsPath, ConfPath),
-                new string[] { "*.bytes" }, null));
+                new string[] { "*.bytes" }, null, null));
             if (source) list.Add((confRepoPath + "/gen/csharp", "Packages/NS.Bridge.Conf/gen",
-                new string[] { "*.cs" }, new string[] { "conf", "rawdata" }));
+                new string[] { "*.cs" }, new string[] { "conf", "rawdata" }, null));
             if (lua) list.Add((confRepoPath + "/gen/lua", $"Assets/{LuaPathEditor}/gen",
-                new string[] { "*.lua" }, null));
-            foreach (var (src, _, _, _) in list) {
+                new string[] { "*.lua" }, null, new string[] { "dbstate" }));
+            foreach (var (src, _, _, _, _) in list) {
                 if (!Directory.Exists(src)) {
                     Debug.LogError($"Config repo path unavailable:{src}");
                     return;
                 }
             }
-            foreach (var (src, dstRoot, pattern, filter) in list) {
+            foreach (var (srcRoot, dstRoot, pattern, white, black) in list) {
                 if (Directory.Exists(dstRoot)) Directory.Delete(dstRoot, true);
-                foreach (var sub in filter ?? Directory.EnumerateDirectories(src)) {
+                Directory.CreateDirectory(dstRoot);
+                var srcDir = new DirectoryInfo(srcRoot);
+                foreach (var sub in white ?? srcDir.EnumerateDirectories().Select(d => d.Name)) {
+                    if (black != null && black.Any(p => sub.Contains(p))) continue;
+                    var src = Path.Combine(srcRoot, sub);
                     var dst = Path.Combine(dstRoot, sub);
                     Debug.Log($"{src} -> {dst}");
-                    FileUtility.CopyDirectory(sub, dst, pattern);
+                    FileUtility.CopyDirectory(src, dst, pattern);
                 }
-                foreach (var file in Directory.EnumerateFiles(dstRoot)) {
-                    File.Copy(file, file.Replace(src, dstRoot), true);
+                foreach (var file in srcDir.EnumerateFiles()) {
+                    file.CopyTo(Path.Combine(dstRoot, $"{file.Name}.{file.Extension}"), true);
                 }
             }
             AssetDatabase.Refresh();
