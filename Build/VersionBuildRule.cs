@@ -38,8 +38,8 @@ namespace NS.Bridge {
             var list = new List<(string, string, string[], string[])>();
             if (data) list.Add((confRepoPath + "/gen/rawdata/client", Path.Combine(Application.streamingAssetsPath, ConfPath),
                 new string[] { "*.bytes" }, null));
-            if (source) list.Add((confRepoPath + "/gen/csharp", "Packages/NS.Bridge/Gen",
-                new string[] { "*.cs" }, null));
+            if (source) list.Add((confRepoPath + "/gen/csharp", "Packages/NS.Bridge.Conf/gen",
+                new string[] { "*.cs" }, new string[] { "conf", "rawdata" }));
             if (lua) list.Add((confRepoPath + "/gen/lua", $"Assets/{LuaPathEditor}/gen",
                 new string[] { "*.lua" }, null));
             foreach (var (src, _, _, _) in list) {
@@ -48,11 +48,16 @@ namespace NS.Bridge {
                     return;
                 }
             }
-            foreach (var (src, dst, pattern, filter) in list) {
-                if (filter != null) FileUtility.DeleteDirectory(dst, filter);
-                else if (Directory.Exists(dst)) Directory.Delete(dst, true);
-                Debug.Log($"{src} -> {dst}");
-                FileUtility.CopyDirectory(src, dst, pattern);
+            foreach (var (src, dstRoot, pattern, filter) in list) {
+                if (Directory.Exists(dstRoot)) Directory.Delete(dstRoot, true);
+                foreach (var sub in filter ?? Directory.EnumerateDirectories(src)) {
+                    var dst = Path.Combine(dstRoot, sub);
+                    Debug.Log($"{src} -> {dst}");
+                    FileUtility.CopyDirectory(sub, dst, pattern);
+                }
+                foreach (var file in Directory.EnumerateFiles(dstRoot)) {
+                    File.Copy(file, file.Replace(src, dstRoot), true);
+                }
             }
             AssetDatabase.Refresh();
         }
