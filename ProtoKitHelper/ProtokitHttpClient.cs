@@ -381,7 +381,6 @@ namespace ProtokitHelper
                 {
                     request.State = ProtoHttpRequestState.Reqeusted;
                     OnResponseFailed(request.ResultCode, rsp.StatusCode.ToString());
-                    Debug.LogWarning($"ProtokitHttpClient request failed. request url:{request.Url}, statusCode:{request.ResultCode}, requestCount:{request.RequestCount}");
                 }
             }
             catch (Exception e)
@@ -416,7 +415,6 @@ namespace ProtokitHelper
                     exceptionType = "RequestTimeout";
                 }
                 OnResponseFailed(request.ResultCode, exceptionType);
-                Debug.LogWarning($"ProtokitHttpClient request throw exception:{e.Message}, url:{request.Url}, ExceptionType:{exceptionType}, statuCode:{request.ResultCode}, requestCount:{request.RequestCount} , StackTrace:{e.StackTrace}");
             }
         }
 
@@ -530,7 +528,6 @@ namespace ProtokitHelper
                 if (RequestBatchRecordMap[sequenceId].Requests.ContainsKey(passthrough))
                     ErrReqUri = RequestBatchRecordMap[sequenceId].Requests[passthrough];
             }
-            Debug.LogWarning($"ProtokitHttpClient receive common error. sequenceId={sequenceId}, passthrough={passthrough}, errorCode={msg.Code}, errorMsg={msg.Message}, errorReq={ErrReqUri}");
             Evt_RecvCommonError?.Invoke(msg.Code, msg.Message);
         }
 
