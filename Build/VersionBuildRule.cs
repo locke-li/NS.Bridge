@@ -59,8 +59,10 @@ namespace NS.Bridge {
                     Debug.Log($"{src} -> {dst}");
                     FileUtility.CopyDirectory(src, dst, pattern);
                 }
-                foreach (var file in srcDir.EnumerateFiles()) {
-                    file.CopyTo(Path.Combine(dstRoot, $"{file.Name}.{file.Extension}"), true);
+                foreach (var p in pattern) {
+                    foreach (var file in srcDir.EnumerateFiles(p)) {
+                        file.CopyTo(Path.Combine(dstRoot, $"{file.Name}"), true);
+                    }
                 }
             }
             AssetDatabase.Refresh();
