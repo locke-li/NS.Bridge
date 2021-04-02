@@ -36,7 +36,6 @@ namespace ProtokitHelper
         private Queue<HttpProtoRequest> SequentialRequests = new Queue<HttpProtoRequest>(256);
         private Queue<HttpRawProto> SequentialRawProtos = new Queue<HttpRawProto>(1024);
         private Dictionary<string, Action<IMessage>> ReqeustMsgHandlerMap = new Dictionary<string, Action<IMessage>>();
-        private Dictionary<string, Action<IMessage>> MessageHandlersMap = new Dictionary<string, Action<IMessage>>();
         private Dictionary<string, DelegateRecvProtoBytes> RequestBytesHandlerMap = new Dictionary<string, DelegateRecvProtoBytes>();
         private HttpProtoRequest CurRequest;
         private HttpProtoRequest LastFailedRequest;
@@ -107,13 +106,6 @@ namespace ProtokitHelper
         /// </summary>
         public string HttpToken { get; private set; }
 
-        /// <summary>
-        /// Http方案
-        /// </summary>
-        public HttpScheme Scheme { get; private set; } = HttpScheme.HttpClient;
-
-        private MonoBehaviour Mono;
-
         //private StringBuilder sb = new StringBuilder();
 
         public void Init(bool queueMode, bool autoRetry, int batchLimit = 1)
@@ -156,17 +148,6 @@ namespace ProtokitHelper
             timeExpect = time;
         }
 
-        public void SwitchSchemeHttpClient()
-        {
-            Scheme = HttpScheme.HttpClient;
-        }
-
-        public void SwitchSchemeUnityWebRequest(MonoBehaviour mono)
-        {
-            Scheme = HttpScheme.UnityWebRequest;
-            Mono = mono;
-        }
-
         public void PostRequestMsg(string url, IMessage msg, Action<IMessage> callback = null, bool waitResponse = true)
         {
             HttpRawProto httpRawProto = new HttpRawProto
@@ -191,34 +172,6 @@ namespace ProtokitHelper
                 Method = HttpMethod.Post
             };
             SequentialRequests.Enqueue(request);
-        }
-
-        /// <summary>
-        /// 注册对某一类型消息的监听函数
-        /// </summary>
-        /// <param name="uri"></param>
-        /// <param name="handler"></param>
-        public void RegisterMessageHandler(string uri, Action<IMessage> handler)
-        {
-            if (MessageHandlersMap.ContainsKey(uri))
-                MessageHandlersMap[uri] += handler;
-            else
-                MessageHandlersMap.Add(uri, handler);
-        }
-
-        /// <summary>
-        /// 移除对某一类型消息的监听函数
-        /// </summary>
-        /// <param name="uri">消息名称</param>
-        /// <param name="handler">消息处理回调</param>
-        public void RemoveMessageHandler(string uri, Action<IMessage> handler)
-        {
-            if (MessageHandlersMap.ContainsKey(uri))
-            {
-                MessageHandlersMap[uri] -= handler;
-                if (MessageHandlersMap[uri] == null)
-                    MessageHandlersMap.Remove(uri);
-            }
         }
 
         public void Update()
@@ -339,10 +292,7 @@ namespace ProtokitHelper
                     if (EnableAutoRetry && CurRequest.RequestCount <= MaxRetry)
                     {
                         OnRequestBegin();
-                        if (Scheme == HttpScheme.HttpClient)
-                            SendRequestAsync(CurRequest);
-                        else if (Scheme == HttpScheme.UnityWebRequest)
-                            SendRequestCoroutine(CurRequest);
+                        SendRequestAsync(CurRequest);
                     }
                     else
                     {
@@ -366,10 +316,7 @@ namespace ProtokitHelper
                 {
                     CurRequest = SequentialRequests.Dequeue();
                     OnRequestBegin();
-                    if (Scheme == HttpScheme.HttpClient)
-                        SendRequestAsync(CurRequest);
-                    else if (Scheme == HttpScheme.UnityWebRequest)
-                        SendRequestCoroutine(CurRequest);
+                    SendRequestAsync(CurRequest);
                 }
             }
         }
@@ -473,92 +420,6 @@ namespace ProtokitHelper
             }
         }
 
-        private void SendRequestCoroutine(HttpProtoRequest request)
-        {
-            try
-            {
-                Mono.StartCoroutine(PostProtoCoroutine(request));
-            }
-            catch (Exception e)
-            {
-                request.State = ProtoHttpRequestState.Reqeusted;
-                string exceptionType = "UnknownError";
-                if (e is ArgumentNullException)
-                {
-                    exceptionType = "ArgumentNull";
-                }
-                else if (e is InvalidOperationException)
-                {
-                    exceptionType = "InvalidOperation";
-                }
-                else if (e is HttpRequestException)
-                {
-                    if (e.InnerException is WebException)
-                    {
-                        WebException webException = e.InnerException as WebException;
-                        exceptionType = webException.Status.ToString();
-                        request.ResultCode = (int)webException.Status;
-                    }
-                    else
-                    {
-                        HttpRequestException httpRequestException = e as HttpRequestException;
-                        request.ResultCode = httpRequestException.HResult;
-                    }
-                }
-                else if (e is TaskCanceledException)
-                {
-                    request.ResultCode = (int)HttpStatusCode.RequestTimeout;
-                    exceptionType = "RequestTimeout";
-                }
-                OnResponseFailed(request.ResultCode, exceptionType);
-                Debug.LogWarning($"ProtokitHttpClient request throw exception:{e.Message}, url:{request.Url}, ExceptionType:{exceptionType}, statuCode:{request.ResultCode}, requestCount:{request.RequestCount} , StackTrace:{e.StackTrace}");
-            }
-        }
-
-        private IEnumerator PostProtoCoroutine(HttpProtoRequest request)
-        {
-            request.State = ProtoHttpRequestState.Reqeusting;
-            request.RequestOutExpectTimeInvoked = false;
-            request.StartTime = Time.realtimeSinceStartup;
-            request.EndTime = 0;
-            request.ResultCode = 0;
-            request.RequestCount++;
-            UnityWebRequest webReq = new UnityWebRequest(request.Url, "POST")
-            {
-                uploadHandler = new UploadHandlerRaw(request.SendData)
-            };
-            webReq.timeout = timeOutms / 1000;
-            var Header = ProtokitUtil.Instance.GetHttpRequestHeader(request, HttpToken);
-            if (Header != null)
-            {
-                foreach (var p in Header)
-                {
-                    if (!p.Key.Equals("Connection") && !p.Key.Equals("Content-Length") && !string.IsNullOrEmpty(p.Value))
-                    {
-                        webReq.SetRequestHeader(p.Key, p.Value);
-                    }
-                }
-            }
-            webReq.downloadHandler = new DownloadHandlerBuffer();
-            if (RequestBatchRecordMap.ContainsKey(request.SequenceId))
-                RequestBatchRecordMap[request.SequenceId].TraceLog();
-            yield return webReq.SendWebRequest();
-            request.ResultCode = (int)webReq.responseCode;
-            if (webReq.isNetworkError || webReq.isHttpError)
-            {
-                request.State = ProtoHttpRequestState.Reqeusted;
-                OnResponseFailed(request.ResultCode, webReq.error);
-                Debug.LogError($"ProtokitHttpClient request failed. request url:{request.Url}, statusCode:{request.ResultCode}, requestCount:{request.RequestCount}, error:{webReq.error}");
-            }
-            else
-            {
-                byte[] retData = webReq.downloadHandler.data;
-                request.State = ProtoHttpRequestState.Responsed;
-                request.EndTime = Time.realtimeSinceStartup;
-                OnResponseSuccess(retData);
-            }
-        }
-
         private void OnResponseSuccess(byte[] data)
         {
             RawPacket rp;
@@ -625,18 +486,6 @@ namespace ProtokitHelper
             {
                 //sb.Length = 0;
                 //sb.AppendFormat("[HTTP][Recv] name:{0}", uri);
-                if (MessageHandlersMap.ContainsKey(uri))
-                {
-                    var parser = ProtokitUtil.Instance.GetParser(uri);
-                    if (parser != null)
-                    {
-                        var message = parser.ParseFrom(data);
-                        //sb.AppendFormat(", body:{0}", message);
-                        MessageHandlersMap[uri].Invoke(message);
-                    }
-                    else
-                        Debug.LogWarning($"can't find message parser, uri={uri}");
-                }
                 if (ReqeustMsgHandlerMap.ContainsKey(passthrough))
                 {
                     var parser = ProtokitUtil.Instance.GetParser(uri);
@@ -728,18 +577,9 @@ namespace ProtokitHelper
                 CurRequest = LastFailedRequest;
                 EnableSendRequest = true;
                 OnRequestBegin();
-                if (Scheme == HttpScheme.HttpClient)
-                    SendRequestAsync(CurRequest);
-                else if (Scheme == HttpScheme.UnityWebRequest)
-                    SendRequestCoroutine(CurRequest);
+                SendRequestAsync(CurRequest);
                 return true;
             }
         }
-    }
-
-    public enum HttpScheme
-    {
-        HttpClient = 1,
-        UnityWebRequest = 2,
     }
 }
