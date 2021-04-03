@@ -357,18 +357,8 @@ namespace CenturyGame.Game
                         
                         s_mLogger.Debug($"DataVersion : {msg.ResourceDetail.DataVersion}");
                         result.update_detail.DataVersion = msg.ResourceDetail.DataVersion;
-                        VersionInfo versionInfo = null;
-#if UNITY_ANDROID
-                        s_mLogger.Debug($"AndroidVersion : {msg.ResourceDetail.AndroidVersion}");
-                        versionInfo = msg.ResourceDetail.AndroidVersion;
-#elif UNITY_IPHONE
-                        s_mLogger.Debug($"IOSVersion : {msg.ResourceDetail.IOSVersion}");
-                        versionInfo = msg.ResourceDetail.IOSVersion;
-#elif UNITY_EDITOR
-                        versionInfo =  msg.ResourceDetail.AndroidVersion ?? msg.ResourceDetail.IOSVersion;
-#else
-                        throw new InvalidOperationException($"Invalid platform : {Application.platform} .");
-#endif
+                        var versionInfo =  msg.ResourceDetail.AndroidVersion ?? msg.ResourceDetail.IOSVersion;
+                        s_mLogger.Debug($"ResVersion : {versionInfo}");
                         result.update_detail.ResVersionNum = versionInfo.Version;
                         result.update_detail.ResVersion = versionInfo.Md5;
                         mReqResult = result;
