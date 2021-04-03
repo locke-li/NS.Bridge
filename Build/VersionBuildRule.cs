@@ -73,12 +73,12 @@ namespace NS.Bridge {
         public static void ClearVersionCache() => ClearVersionCache(true);
 
         public static void ClearVersionCache(bool overwrite) {
+            var platform = "Android";//TODO get it from somewhere
             var appInfoFile = Path.Combine(Application.streamingAssetsPath, "app_info.x");
             var resDataFile = Path.Combine(Application.streamingAssetsPath, "res_data.json");
-            var resAssetFile = Path.Combine(Application.streamingAssetsPath, "res_android.json");
+            var resAssetFile = Path.Combine(Application.streamingAssetsPath, $"res_{platform.ToLower()}.json");
             var list = new string[] { appInfoFile, resDataFile, resAssetFile };
             if (!overwrite && list.All(f => File.Exists(f))) return;
-            var platform = "Android";
             var emptyAppInfo = $"{{\"version\": \"0.0.0\", \"dataResVersion\": \"0\", \"unityDataResVersion\": \"0\", \"TargetPlatform\": \"{platform}\"}}";
             Directory.CreateDirectory(Application.streamingAssetsPath);
             File.WriteAllText(appInfoFile, emptyAppInfo);
