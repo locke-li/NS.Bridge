@@ -6,10 +6,11 @@
   "displayName": "NS.Bridge",
   "keywords": [],
   "dependency": {
-	"com.unity.textmeshpro": "1.4.1"
+    "com.unity.textmeshpro": "1.4.1"
   },
   "repository": {
     "url": "https://gitlab.funplus.io/yingbo.li/NS.Bridge.git",
     "type": "git"
-  }
+  },
+  "hideInEditor": false
 }

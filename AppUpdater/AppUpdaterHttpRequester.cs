@@ -250,24 +250,12 @@ namespace CenturyGame.Game
                 s_mLogger.Error("Invalid ResourceDetail!");
                 return false;
             }
-
-#if UNITY_ANDROID
-            if (response.ResourceDetail.AndroidVersion == null)
-            {
-                s_mLogger.Error("Invalid AndroidVersion!");
+            if (response.ResourceDetail.AndroidVersion == null
+                && response.ResourceDetail.IOSVersion == null)  {
+                s_mLogger.Error("Invalid ResVersion!");
                 return false;
             }
-#elif UNITY_IPHONE
-            if (response.ResourceDetail.IOSVersion == null)
-            {
-                s_mLogger.Error("Invalid IOSVersion!");
-                return false;
-            }
-#else
-            throw new InvalidOperationException($"Invalid platform : {Application.platform} .");
-#endif
             return true;
-
         }
 
         private void SetMetadata(RawPacket rp)
@@ -369,17 +357,20 @@ namespace CenturyGame.Game
                         
                         s_mLogger.Debug($"DataVersion : {msg.ResourceDetail.DataVersion}");
                         result.update_detail.DataVersion = msg.ResourceDetail.DataVersion;
+                        VersionInfo versionInfo = null;
 #if UNITY_ANDROID
                         s_mLogger.Debug($"AndroidVersion : {msg.ResourceDetail.AndroidVersion}");
-                        result.update_detail.ResVersionNum = msg.ResourceDetail.AndroidVersion.Version;
-                        result.update_detail.AndroidVersion = msg.ResourceDetail.AndroidVersion.Md5;
+                        versionInfo = msg.ResourceDetail.AndroidVersion;
 #elif UNITY_IPHONE
                         s_mLogger.Debug($"IOSVersion : {msg.ResourceDetail.IOSVersion}");
-                        result.update_detail.ResVersionNum = msg.ResourceDetail.IOSVersion.Version;
-                        result.update_detail.IOSVersion = msg.ResourceDetail.IOSVersion.Md5;
+                        versionInfo = msg.ResourceDetail.IOSVersion;
+#elif UNITY_EDITOR
+                        versionInfo =  msg.ResourceDetail.AndroidVersion ?? msg.ResourceDetail.IOSVersion;
 #else
                         throw new InvalidOperationException($"Invalid platform : {Application.platform} .");
 #endif
+                        result.update_detail.ResVersionNum = versionInfo.Version;
+                        result.update_detail.ResVersion = versionInfo.Md5;
                         mReqResult = result;
                         mInnerState = InnerState.RequestCompleted;
                         WhenSuccess(mChannel, mUrlList, mUrlList[mCurReqUrlIndex]);
