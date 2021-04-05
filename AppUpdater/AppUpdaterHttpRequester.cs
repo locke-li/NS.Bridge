@@ -82,7 +82,8 @@ namespace CenturyGame.Game
         /// <summary>
         /// 请求的服务器的url列表，包括主服务器和fallback列表
         /// </summary>
-        private string[] mUrlList;
+        public string[] UrlList;
+        public string CurrentUrl => UrlList[mCurReqUrlIndex];
 
         /// <summary>
         /// 当前请求的
@@ -96,7 +97,7 @@ namespace CenturyGame.Game
         private float mStartTime = 0;
         private float mReqInternal = 3f;
 
-        private Action<string, string[], string> WhenSuccess;
+        public Action WhenSuccess;
 
         #endregion
 
@@ -105,7 +106,6 @@ namespace CenturyGame.Game
         //--------------------------------------------------------------
 
         public InnerState State => mInnerState;
-        
 
         #endregion
 
@@ -113,12 +113,10 @@ namespace CenturyGame.Game
         #region Creation & Cleanup
         //--------------------------------------------------------------
 
-        public AppUpdaterHttpRequester(HttpManager httpManager, Action<string, string[], string> WhenSuccess_)
+        public AppUpdaterHttpRequester(HttpManager httpManager)
         {
             mHttpManager = httpManager;
-            WhenSuccess = WhenSuccess_;
         }
-       
 
         #endregion
 
@@ -151,9 +149,9 @@ namespace CenturyGame.Game
         public void ReqGetVersion(LighthouseConfig.Server serverData, string appVersion, string lighthouseId,string channel , FileServerType fromTo, Action<GetVersionResponseInfo> getVersionResponseInfoAction)
         {
             Clear();
-            mUrlList = new string[serverData.FallbackUrlList.Count + 1];
-            mUrlList[0] = serverData.Url;
-            serverData.FallbackUrlList.ForCall((x, index) => { mUrlList[index+1] = x; });
+            UrlList = new string[serverData.FallbackUrlList.Count + 1];
+            UrlList[0] = serverData.Url;
+            serverData.FallbackUrlList.ForCall((x, index) => { UrlList[index+1] = x; });
 
             s_mLogger.Debug($"[appVersion : {appVersion}] [lighthouseId : {lighthouseId}] [channel : {channel}] [fromTo : {fromTo}] .");
 
@@ -174,13 +172,14 @@ namespace CenturyGame.Game
             mInnerState = InnerState.Idle;
             mGetVersionInfoEvent = null;
             mReqResult = null;
-            mUrlList = null;
+            UrlList = null;
             mCurReqUrlIndex= DefaultUrlsReqIndex;
             mCurRequest = null;
         }
 
         private void OnReqCompleted()
         {
+            WhenSuccess?.Invoke();
             mGetVersionInfoEvent?.Invoke(mReqResult);
             Clear();
         }
@@ -290,8 +289,7 @@ namespace CenturyGame.Game
                 {"Content-Type", "application/x-protobuf"}, {"charset", "utf-8"}
             };
 
-            var curUrl = mUrlList[mCurReqUrlIndex];
-            curUrl = OptimizeUrl(curUrl + "/lighthouse");
+            var curUrl = UrlList[mCurReqUrlIndex] + "/lighthouse";
             s_mLogger.Info($"Current req url : {curUrl} !");
             mHttpManager.PostHttpRequest(curUrl, header, GetRawPacketData(rp), recvData =>
             {
@@ -302,13 +300,14 @@ namespace CenturyGame.Game
                     return;
                 }
 
+                var result = new GetVersionResponseInfo();
                 var receiveData = RawPacket.Parser.ParseFrom(recvData);
                 if (ErrorResponse.Descriptor.FullName.Equals(receiveData.RawAny[0].Uri))
                 {
                     var errorMsg = ErrorResponse.Parser.ParseFrom(receiveData.RawAny[0].Raw);
                     s_mLogger.Info($"ErrorResponse code : {errorMsg.Code}");
                     var lighthouse_id = new System.Text.UTF8Encoding(false, true).GetString(errorMsg.Data.ToByteArray());
-                    GetVersionResponseInfo result = new GetVersionResponseInfo();
+                    
                     result.lighthouseId = lighthouse_id;                    
                     if (errorMsg.Code == APP_UPDATE_ERROR_CODE.MAINTENANCE)
                     {
@@ -333,10 +332,9 @@ namespace CenturyGame.Game
                     var redirectUrl = msg.RedirectURL;
                     if (!string.IsNullOrEmpty(msg.RedirectURL))
                     {
-                        redirectUrl = OptimizeUrl(redirectUrl);
                         if (!string.Equals(redirectUrl, curUrl))
                         {
-                            mUrlList = new string[] { redirectUrl };
+                            UrlList = new string[] { redirectUrl };
                             mCurReqUrlIndex = DefaultUrlsReqIndex;
                             mStartTime = Time.realtimeSinceStartup;
                             mInnerState = InnerState.WaitForReq;
@@ -347,7 +345,6 @@ namespace CenturyGame.Game
 
                     if (CheckEntryPointResponseValid(msg))
                     {
-                        GetVersionResponseInfo result = new GetVersionResponseInfo();
                         result.url = curUrl;
                         result.forceUpdate = msg.ForceUpdate;
                         result.lighthouseId = msg.LighthouseId;
@@ -363,7 +360,6 @@ namespace CenturyGame.Game
                         result.update_detail.ResVersion = versionInfo.Md5;
                         mReqResult = result;
                         mInnerState = InnerState.RequestCompleted;
-                        WhenSuccess(mChannel, mUrlList, mUrlList[mCurReqUrlIndex]);
                     }
                     else
                     {
@@ -390,20 +386,9 @@ namespace CenturyGame.Game
             }
         }
 
-        private string OptimizeUrl(string url)
-        {
-            int length = url.Length;
-            if (url[length - 1] == '/')
-            {
-                url = url.Substring(0,length -1);
-            }
-
-            return url;
-        }
-
         private bool CheckCurrentUrlValid()
         {
-            if (mCurReqUrlIndex >= mUrlList.Length - 1)
+            if (mCurReqUrlIndex >= UrlList.Length - 1)
             {
                 return false;
             }
