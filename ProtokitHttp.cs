@@ -11,6 +11,7 @@ using Google.Protobuf;
 using UnityEngine;
 using UnityEngine.Networking;
 using Transient;
+using System;
 using netutils;
 
 namespace NS.Bridge {
