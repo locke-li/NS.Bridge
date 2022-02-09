@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using CenturyGame.AppBuilder.Editor.Builds;
 using static NS.Bridge.PathSetting;
+using System.Text.RegularExpressions;
 
 namespace NS.Bridge {
     public static class VersionBuildRule {
@@ -98,7 +99,7 @@ namespace NS.Bridge {
             var reader = new StreamReader(File.OpenRead(file));
             while (!reader.EndOfStream) {
                 var line = reader.ReadLine();
-                if (line.Contains("dataResVersion")) builder.AppendLine("    \"dataResVersion\": \"0\",");
+                if (line.Contains("dataResVersion")) builder.AppendLine(Regex.Replace(line, "\"dataResVersion\": \"\\d+\"", "\"dataResVersion\": \"0\""));
                 else builder.AppendLine(line);
             }
             reader.Close();
